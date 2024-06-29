@@ -6,7 +6,8 @@ CREATE TABLE public.log_execucao (
 	logexeusu int2 NOT NULL,
 	logexedatini date NOT NULL,
 	logexedathorini timestamp NOT NULL,
-	logexedathorfin timestamp NULL DEFAULT '0001-01-01 00:00:00'::timestamp without time zone,logexetemtot TIME NOT NULL GENERATED ALWAYS AS (CASE WHEN logexedathorfin <> '0001-01-01 00:00:00.000' THEN (logexedathorfin - logexedathorini) ELSE (logexedathorcan - logexedathorini) END) STORED;
+	logexedathorfin timestamp NULL DEFAULT '0001-01-01 00:00:00'::timestamp without time zone,
+        ALTER TABLE log_execucao ADD COLUMN logexetemtot TIME NOT NULL GENERATED ALWAYS AS (CASE WHEN logexedathorfin <> '0001-01-01 00:00:00.000' THEN (logexedathorfin - logexedathorini) ELSE (logexedathorcan - logexedathorini) END) STORED,
 	logexedathorcan timestamp NULL DEFAULT '0001-01-01 00:00:00'::timestamp without time zone,
 	logexeusucan int2 NULL DEFAULT 0,
 	logexecan int2 NULL DEFAULT 0,
