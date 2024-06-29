@@ -1,3 +1,5 @@
+-- DROP FUNCTION public.cobranca_historico_gravar();
+
 CREATE OR REPLACE FUNCTION public.cobranca_historico_gravar()
  RETURNS text
  LANGUAGE plpgsql
@@ -13,6 +15,8 @@ DECLARE
     _date DATE := current_date;
     _timeStart TIMESTAMP without time zone := clock_timestamp();
     _timeEnd TIMESTAMP without time zone := '0001-01-01 00:00:00.000';
+    _timeCancel TIMESTAMP without time zone := '0001-01-01 00:00:00.000';
+    _functionCancel INT := 0;
     _recordData RECORD;
 BEGIN 
 	
@@ -32,9 +36,11 @@ BEGIN
 	    
 	   IF _countHistory <> _count THEN 
 	   	 _messageError := 'A quantidade de parcelas inseridas é diferente da quantidade de parcelas ativas.';
+	   	 _timeCancel := clock_timestamp();
+	   	 _functionCancel := 1;
 	   
-	   	 INSERT INTO log_execucao (logexedes, logexeobj, logexeusu, logexedatini, logexedathorini, logexedathorfin) 
-		 VALUES (_messageError, _functionName, _user, _date, _timeStart, _timeEnd);
+		 INSERT INTO log_execucao (logexedes, logexeobj, logexeusu, logexedatini, logexedathorini, logexedathorfin, logexedathorcan, logexeusucan, logexecan) 
+		 VALUES (_messageError, _functionName, _user, _date, _timeStart, _timeEnd, _timeCancel, _user, _functionCancel); 	
 	   	 
 	   	 TRUNCATE cobranca_historico;
 	   END IF;
@@ -48,6 +54,7 @@ BEGIN
 	     SELECT cp.conparseq,
 				ARRAY[cp.conpardatven, ch.conpardatven] conpardatven,
 				ARRAY[cp.conparvalsal, ch.conparvalsal] conparvalsal,
+				ARRAY[cp.conparvallan, ch.conparvallan] conparvallan,
 				ARRAY[con.carcod, ch.carcod] carcod,
 				ARRAY[con.procod, ch.procod] procod
           FROM contrato con 
@@ -65,18 +72,21 @@ BEGIN
 				 		     LIMIT 1) ch ON TRUE)                           
      LOOP
 	     
-	     IF _recordData.conparvalsal[1] <> _recordData.conparvalsal[2] THEN 
-	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 1);
+	     IF _recordData.conparvallan[1] <> _recordData.conparvallan[2] THEN 
+	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 2);
+
+	     ELSEIF _recordData.conparvalsal[1] <> _recordData.conparvalsal[2] THEN 
+	       PERFORM cobranca_historico_atualizacao_saldo(_recordData.conparseq);	     
 	     
 	     ELSEIF _recordData.conpardatven[1] <> _recordData.conpardatven[2] THEN 
-	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 2);
+	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 4);
+	      
+	     ELSEIF _recordData.carcod[1] <> _recordData.carcod[2] THEN  
+	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 5);
 	     
 	     ELSEIF _recordData.procod[1] <> _recordData.procod[2] THEN 
-	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 3);
+	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 6);
 		 
-	     ELSEIF _recordData.carcod[1] <> _recordData.carcod[2] THEN  
-	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 4);
-
 	     END IF;
 	 _message := 'Sucesso na execução.';
 	    
@@ -98,10 +108,12 @@ EXCEPTION
 	WHEN OTHERS THEN  
 	
 	_timeEnd := '0001-01-01 00:00:00.000';
+    _timeCancel := clock_timestamp();
+    _functionCancel := 1;
     _messageError := SQLERRM;
 	
-	INSERT INTO log_execucao (logexedes, logexeobj, logexeusu, logexedatini, logexedathorini, logexedathorfin) 
-	VALUES (_messageError, _functionName, _user, _date, _timeStart, _timeEnd); 	
+	INSERT INTO log_execucao (logexedes, logexeobj, logexeusu, logexedatini, logexedathorini, logexedathorfin, logexedathorcan, logexeusucan, logexecan) 
+	VALUES (_messageError, _functionName, _user, _date, _timeStart, _timeEnd, _timeCancel, _user, _functionCancel); 	
 
 	RETURN _messageError;
 END;
