@@ -1,10 +1,8 @@
--- DROP FUNCTION public.cobranca_historico_atualizacao_saldo(int8);
-
 CREATE OR REPLACE FUNCTION public.cobranca_historico_atualizacao_saldo(_conparseq bigint)
  RETURNS void
  LANGUAGE sql
 AS $function$
--- Da para unificar em uma unica consulta para melhorar a performance.
+
 WITH contrato_parcela_pagamento AS (
 	SELECT COALESCE(cpr.opecod, 0) chave_pagamento,
 		   COALESCE(cpr.conparretdatinc, '0001-01-01 00:00:00.000') data_inclusao_pagamento,
@@ -27,18 +25,18 @@ WITH contrato_parcela_pagamento AS (
 ),
  contrato_parcela_validacao AS ( 
 SELECT CASE 
-		   WHEN cpp.data_inclusao_pagamento > cpd.data_inclusao_devolucao THEN cpp.chave_pagamento
-		   WHEN cpd.data_inclusao_devolucao > cpp.data_inclusao_pagamento THEN cpd.chave_devolucao
+		   WHEN cpp.data_inclusao_pagamento > cpd.data_inclusao_devolucao AND data_inclusao_pagamento <> '0001-01-01 00:00:00.000' THEN cpp.chave_pagamento
+		   WHEN cpd.data_inclusao_devolucao > cpp.data_inclusao_pagamento AND data_inclusao_devolucao <> '0001-01-01 00:00:00.000' THEN cpd.chave_devolucao
 		   ELSE 0
 		END chave_tabela,
 		CASE 
-		   WHEN cpp.data_inclusao_pagamento > cpd.data_inclusao_devolucao THEN 2
-		   WHEN cpd.data_inclusao_devolucao > cpp.data_inclusao_pagamento THEN 3
+		   WHEN cpp.data_inclusao_pagamento > cpd.data_inclusao_devolucao AND data_inclusao_pagamento <> '0001-01-01 00:00:00.000' THEN 2
+		   WHEN cpd.data_inclusao_devolucao > cpp.data_inclusao_pagamento AND data_inclusao_devolucao <> '0001-01-01 00:00:00.000' THEN 3
 		   ELSE 7
 		END regra_tipo,
 		CASE 
-		   WHEN cpp.data_inclusao_pagamento > cpd.data_inclusao_devolucao THEN cpp.conparseq
-		   WHEN cpd.data_inclusao_devolucao > cpp.data_inclusao_pagamento THEN cpd.conparseq
+		   WHEN cpp.data_inclusao_pagamento > cpd.data_inclusao_devolucao AND data_inclusao_pagamento <> '0001-01-01 00:00:00.000' THEN cpp.conparseq
+		   WHEN cpd.data_inclusao_devolucao > cpp.data_inclusao_pagamento AND data_inclusao_devolucao <> '0001-01-01 00:00:00.000' THEN cpd.conparseq
 		   ELSE _conparseq
 		END conparseq
   FROM contrato_parcela_pagamento cpp
