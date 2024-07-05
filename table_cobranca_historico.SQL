@@ -17,3 +17,4 @@ CREATE TABLE cobranca_historico (
 ALTER TABLE cobranca_historico DROP CONSTRAINT cobranca_historico_conparseq_fkey;
 ALTER TABLE cobranca_historico DROP CONSTRAINT cobranca_historico_carcod_fkey;
 ALTER TABLE cobranca_historico DROP CONSTRAINT cobranca_historico_procod_fkey;
+ALTER TABLE cobranca_historico ADD COLUMN conparacocod bigint DEFAULT 0;
