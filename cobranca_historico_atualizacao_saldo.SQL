@@ -42,7 +42,7 @@ SELECT CASE
   FROM contrato_parcela_pagamento cpp
   	 JOIN contrato_parcela_devolucao cpd ON cpp.conparseq = cpd.conparseq
 )
-INSERT INTO cobranca_historico (conparseq, conparati, conpardatinc, conpardatven, conparvallan, conparvalsal, carcod, procod, cobhismovtip, cobhismovcod)
+INSERT INTO cobranca_historico (conparseq, conparati, conpardatinc, conpardatven, conparvallan, conparvalsal, carcod, procod, cobhismovtip, cobhismovcod, conparacocod)
 SELECT cp.conparseq,
        cp.conparati,
        cp.conpardatinc,
@@ -52,7 +52,8 @@ SELECT cp.conparseq,
        con.carcod,
        con.procod,
        cpv.regra_tipo,
-       cpv.chave_tabela
+       cpv.chave_tabela,
+       CASE WHEN cpv.regra_tipo = 3 THEN cp.conparacocod ELSE 0 END
   FROM contrato con 
   	  JOIN contrato_parcela cp ON con.concod = cp.concod
   	  JOIN contrato_parcela_validacao cpv ON cp.conparseq = cpv.conparseq;
