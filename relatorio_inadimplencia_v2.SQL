@@ -89,14 +89,21 @@ SELECT sum(conparvalsal) valor_acordo
   FROM cobranca_registro_acordo cra
  WHERE cra.registro_base = 1
 ),
- valor_desconto AS (
-SELECT sum(cpc.conparcalval) valor_desconto
+ cobranca_registro_desconto AS (
+SELECT DISTINCT
+	   cpc.conparcalval,
+	   cpc.conparseq,
+	   cpc.tipenccod 
   FROM cobranca_registro_acordo cra 
   	  JOIN contrato_parcela cp ON cra.conparseq = cp.conparseq
   	  JOIN credigy_parcela cpp ON cp.concod = cpp.creparconref
   	  JOIN contrato_parcela_calculo cpc ON cpp.creparseq = cpc.conparseq AND cpc.conparcalati = 0
- WHERE cpc.tipenccod > 6000
-   AND cra.registro_base = 1
+ WHERE cpc.tipenccod >= 6000
+   AND cra.registro_base = 1 
+),
+ valor_desconto AS (
+SELECT sum(crd.conparcalval) valor_desconto
+  FROM cobranca_registro_desconto crd 
 ),
  valor_cpc_negativo AS (
 SELECT sum(v.conparvalsal) valor_cpc_negativo
