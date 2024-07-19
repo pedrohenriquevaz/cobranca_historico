@@ -246,8 +246,15 @@ BEGIN
 	 _query := REPLACE(_query, '[FILTRO_CARTEIRA]', _filtroCarteira);
 	 _query := REPLACE(_query, '[FILTRO_DATA]', _filtroData);
      _query := _query||_header||_campos;
-	
+    
+     _query := E'COPY ('||_query||') TO '''||_segcaminho||'''';
+    
      RAISE NOTICE '%', _query;
+    
+     EXECUTE _query;
+    
+	 INSERT INTO logsegmentacao (logsegcod, logsegque, logsegdatinc, logsegsegcod, logsegbasfil)
+     VALUES (DEFAULT, _query, clock_timestamp(), _segcod, 'gera_relatorio_inadimplencia(int8, text)');
     
 RETURN '';
 EXCEPTION
