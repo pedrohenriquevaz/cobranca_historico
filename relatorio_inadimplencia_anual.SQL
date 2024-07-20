@@ -1,3 +1,4 @@
+--EXPLAIN (ANALYZE, costs, buffers, FORMAT JSON)
 WITH data_referencia AS (
 	SELECT date_trunc('month', current_date)::date data_inicial,
     	  (date_trunc('month', current_date) + interval '1 month - 1 day')::date data_final
@@ -164,7 +165,7 @@ SELECT vct.faixa,
        formatar_valor(COALESCE(va.valor_acordo, 0)),
        round((COALESCE(va.valor_acordo, 0) / COALESCE(sum(vct.conparvalsal), 1) * 100), 2)::TEXT,
        formatar_valor(COALESCE(vd.valor_desconto, 0)),
-       round((COALESCE(vd.valor_desconto, 0) / (COALESCE(va.valor_acordo, 1) + COALESCE(vd.valor_desconto, 1)) * 100), 2)::TEXT,
+       round((COALESCE(vd.valor_desconto, 0) / (COALESCE(va.valor_acordo, u8 b 1) + COALESCE(vd.valor_desconto, 1)) * 100), 2)::TEXT,
        formatar_valor(COALESCE(vr.valor_retomada, 0)),
        round((COALESCE(vr.valor_retomada, 0) / COALESCE(sum(vct.conparvalsal), 1) * 100), 2)::TEXT
   FROM fase_periodo fp
