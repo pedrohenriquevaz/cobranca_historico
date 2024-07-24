@@ -10,7 +10,8 @@ CREATE TABLE cobranca_historico (
 	carcod BIGINT REFERENCES carteira(carcod) NOT NULL,
 	procod INT REFERENCES produto(procod) NOT NULL,
 	cobhismovtip SMALLINT REFERENCES cobranca_historico_movimentacao_tipo(cobhismovtip) DEFAULT 0,
-	cobhismovcod BIGINT DEFAULT 0
+	cobhismovcod BIGINT DEFAULT 0,
+        conparacocod BIGINT DEFAULT 0
 );
 
 -- Caso necessite remover restrições de chave estrangeira:
