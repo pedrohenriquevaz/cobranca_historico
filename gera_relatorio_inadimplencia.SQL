@@ -5,10 +5,9 @@ CREATE OR REPLACE FUNCTION public.gera_relatorio_inadimplencia(_segcod bigint, _
  LANGUAGE plpgsql
 AS $function$
 DECLARE
-    _header TEXT := '';
+	_header TEXT := '';
     _campos TEXT = '';
     _query TEXT := '';
-    _string TEXT := '';
     _produtoCodigo INT := 0;
     _carteiraCodigo INT := 0;
     _dataInicial DATE := '0001-01-01';
@@ -18,14 +17,18 @@ DECLARE
     _visaoRelatorio INT := 0;   
     _dataCalculo TEXT := '0001-01-01';
     _regraVencimento INT := 0;
+    _diasAtraso INT := 1;
+    _clienteAjuizado TEXT := '';
     _filtroProduto TEXT := '';
+    _filtroProdutoRetomada TEXT := '';
     _filtroCarteira TEXT := '';
-    _filtroData TEXT := '';
+    _filtroPeriodo TEXT := '';
     _filtroFase TEXT := '';
     _filtroVisaoRelatorio TEXT := '';
-    _filtroDataCalculo TEXT := '';
+    _filtroDataAtraso TEXT := '';
     _filtroAjuizado TEXT := '';
     _filtroRegraVencimento TEXT := '';
+    _filtroDataCalculo TEXT := '';
 BEGIN 
 	  
 	-- Produto.
@@ -70,18 +73,18 @@ BEGIN
 	  INTO _visaoRelatorio
 	  FROM segmentacaolevel1level2 s
 	 WHERE s.segcod = _segcod
-	   AND s.segfilcod = 603;  
+	   AND s.segfilcod = 603;
 	  
-	-- Data de Cálculo.
-	SELECT COALESCE(''''||s.segfild01||'''', '0001-01-01')
-	  INTO _dataCalculo
+	-- Dias para considerar atraso.
+	SELECT COALESCE(s.segfili01, 0)
+	  INTO _diasAtraso 
 	  FROM segmentacaolevel1level2 s
 	 WHERE s.segcod = _segcod
-	   AND s.segfilcod = 604;
+	   AND s.segfilcod = 604;  
 	  
 	-- Clientes Ajuizados.
 	SELECT COALESCE(s.segfilc01, 'S')
-	  INTO _string
+	  INTO _clienteAjuizado
 	  FROM segmentacaolevel1level2 s
 	 WHERE s.segcod = _segcod
 	   AND s.segfilcod = 605;
@@ -91,29 +94,42 @@ BEGIN
 	  INTO _regraVencimento
 	  FROM segmentacaolevel1level2 s
 	 WHERE s.segcod = _segcod
-	   AND s.segfilcod = 606; 
+	   AND s.segfilcod = 606;  
+	  
+    -- Data de Cálculo.
+	SELECT COALESCE(''''||s.segfild01||'''', '0001-01-01')
+	  INTO _dataCalculo
+	  FROM segmentacaolevel1level2 s
+	 WHERE s.segcod = _segcod
+	   AND s.segfilcod = 607; 
 	
+	IF _dataCalculo ISNULL THEN 
+	   _dataCalculo := '0001-01-01';
+	END IF;
+	  
 	-- Produto.
 	IF _produtoCodigo > 0 THEN 
 	   _filtroProduto := 'AND ch.procod = '||_produtoCodigo;
+	   _filtroProdutoRetomada := 'AND ch.procod = '||_produtoCodigo;
 	ELSE
 	   _filtroProduto := 'AND ch.procod <> 28';
 	END IF;
 
+	-- Carteira.
 	IF _carteiraCodigo > 0 THEN 
 	   _filtroCarteira := 'AND ch.carcod = '||_carteiraCodigo;
 	END IF;
  
     -- Período de Referência.
     IF _dataInicial <> '0001-01-01' AND _dataFinal <> '0001-01-01' THEN 
-	   _filtroData := 'SELECT '||_dataInicial||' data_inicial,
-							  '||_dataFinal||' data_final';
+	   _filtroPeriodo := 'SELECT '''||_dataInicial||'''::DATE data_inicial,
+							  '''||_dataFinal||'''::DATE data_final';
     ELSE 
        IF _relatorioTipo = 0 THEN 
-	   _filtroData := 'SELECT date_trunc(''month'', current_date)::date data_inicial,
+	   _filtroPeriodo := 'SELECT date_trunc(''month'', current_date)::date data_inicial,
     	  					 (date_trunc(''month'', current_date) + interval ''1 month - 1 day'')::date data_final';
        ELSE 
-   	   _filtroData := 'SELECT date_trunc(''year'', current_date)::date data_inicial,
+   	   _filtroPeriodo := 'SELECT date_trunc(''year'', current_date)::date data_inicial,
 	  					 (date_trunc(''year'', current_date) + interval ''1 year - 1 day'')::date data_final';
        END IF;
 	END IF;
@@ -125,15 +141,24 @@ BEGIN
        _filtroFase := 'AND f.fascod = 6';
     END IF;
    
-    -- Data de Cálculo.
+    -- Data de Cálculo do atraso.
     IF _dataCalculo <> '0001-01-01' THEN 
        _filtroDataCalculo := _dataCalculo;
-    ELSE 
+    ELSE
        _filtroDataCalculo := ''''||to_char(current_date, 'YYYY-MM-DD')||'''';
+       _dataCalculo := ''''||to_char(current_date, 'YYYY-MM-DD')||''''; -- Preencher a própria variável é sacanagem.
     END IF;
-
+   
+    -- Dias para considerar atraso.
+    IF _diasAtraso <> 0 THEN
+       _diasAtraso := _diasAtraso - 1;
+       _filtroDataAtraso := ''''||to_char(REPLACE(_dataCalculo, '''', '')::DATE - _diasAtraso, 'YYYY-MM-DD')||'''';
+    ELSE 
+       _filtroDataAtraso := _dataCalculo;
+    END IF;
+   
     -- Clientes Ajuizados.
-    IF _string = 'N' THEN 
+    IF _clienteAjuizado = 'N' THEN 
 	   _filtroAjuizado := '
 		   AND NOT EXISTS (SELECT NULL 
 							 FROM contrato con 
@@ -145,7 +170,7 @@ BEGIN
     -- Regra de Faturas a Considerar.
     IF _regraVencimento = 0 THEN
       _filtroRegraVencimento := '
-			AND (cr.conpardatven < [FILTRO_DATA_CALCULO]
+			AND (cr.conpardatven < [FILTRO_DATA_ATRASO]
 	         OR EXISTS (SELECT NULL
 	        			  FROM credigy_parcela cpp 
 	       			    	 JOIN contrato con ON cpp.creparconref = con.concod
@@ -157,7 +182,7 @@ BEGIN
 					  FROM devedor dev 
 	                      JOIN contrato con ON dev.devcod = con.devcod AND dev.carcod = con.carcod
 					      JOIN contrato_parcela cp ON cr.conparseq = cp.conparseq
-					 WHERE dev.devvenmaisantigo < [FILTRO_DATA_CALCULO])';
+					 WHERE dev.devvenmaisantigo < [FILTRO_DATA_ATRASO])';
     END IF;
     
     
@@ -321,19 +346,16 @@ BEGIN
 			 					   AND cra.carcod = con.carcod)
 			),
 			 cobranca_registro_retomada AS (
-			SELECT DISTINCT 
-			       ch.conparseq,
-				   cpr.conparretvallan,
+			SELECT cpr.conparretvallan,
 				   cpr.tipenccod
 			  FROM cobranca_historico ch 
-			  	  JOIN contrato_parcela_retomada cpr ON ch.conparseq = cpr.conparseq AND cpr.conparretati = 0 AND cpr.tipenccod < 5000
+			  	  JOIN contrato_parcela_retomada cpr ON ch.conparseq = cpr.conparseq AND cpr.conparretati = 0 
 			  	  JOIN data_referencia dr ON cpr.conparretdatinc::date BETWEEN dr.data_inicial AND dr.data_final
-			 WHERE TRUE 
 	         [FILTRO_CARTEIRA]
-	         [FILTRO_PRODUTO]
+	         [FILTRO_PRODUTO_RETOMADA]
 			),
 			 valor_retomada AS (
-			SELECT sum(crr.conparretvallan) valor_retomada
+			SELECT (sum(crr.conparretvallan) FILTER (WHERE crr.tipenccod <= 5000)) - COALESCE((sum(crr.conparretvallan) FILTER (WHERE crr.tipenccod >= 6001)), 0) valor_retomada
 			  FROM cobranca_registro_retomada crr 
 			)';
 		
@@ -556,20 +578,18 @@ BEGIN
 			 GROUP BY 2
 			),
 			 cobranca_registro_retomada AS (
-			SELECT DISTINCT 
-			       ch.conparseq,
-				   cpr.conparretvallan,
+			SELECT cpr.conparretvallan,
 				   cpr.tipenccod,
 				   fp.faixa
 			  FROM cobranca_historico ch 
-			  	  JOIN contrato_parcela_retomada cpr ON ch.conparseq = cpr.conparseq AND cpr.conparretati = 0 AND cpr.tipenccod < 5000
+			  	  JOIN contrato_parcela_retomada cpr ON ch.conparseq = cpr.conparseq AND cpr.conparretati = 0 
 			  	  JOIN data_referencia dr ON cpr.conparretdatinc::date BETWEEN dr.data_inicial AND dr.data_final
 			  	  JOIN fase_periodo fp ON ([FILTRO_DATA_CALCULO] - ch.conpardatven) BETWEEN fp.dias_inicio AND fp.dias_fim
 	         [FILTRO_CARTEIRA]
-	         [FILTRO_PRODUTO]
+	         [FILTRO_PRODUTO_RETOMADA]
 			),
 			 valor_retomada AS (
-			SELECT sum(crr.conparretvallan) valor_retomada,
+			SELECT (sum(crr.conparretvallan) FILTER (WHERE crr.tipenccod <= 5000)) - COALESCE((sum(crr.conparretvallan) FILTER (WHERE crr.tipenccod >= 6001)), 0) valor_retomada,
 				   crr.faixa
 			  FROM cobranca_registro_retomada crr 
 			 GROUP BY 2
@@ -614,14 +634,14 @@ BEGIN
 		    ORDER BY sequencia)'; 
      END IF;
     
---     RAISE NOTICE '%', _query;
-    
 	 _query := REPLACE(_query, '[FILTRO_VISAO_RELATORIO]', _filtroVisaoRelatorio);
 	 _query := REPLACE(_query, '[FILTRO_REGRA_VENCIMENTO]', _filtroRegraVencimento);
 	 _query := REPLACE(_query, '[FILTRO_DATA_CALCULO]', _filtroDataCalculo);
+	 _query := REPLACE(_query, '[FILTRO_DATA_ATRASO]', _filtroDataAtraso);
+	 _query := REPLACE(_query, '[FILTRO_PRODUTO_RETOMADA]', _filtroProdutoRetomada); 
 	 _query := REPLACE(_query, '[FILTRO_PRODUTO]', _filtroProduto);
 	 _query := REPLACE(_query, '[FILTRO_CARTEIRA]', _filtroCarteira);
-	 _query := REPLACE(_query, '[FILTRO_DATA]', _filtroData);
+	 _query := REPLACE(_query, '[FILTRO_DATA]', _filtroPeriodo);
 	 _query := REPLACE(_query, '[FILTRO_FASE]', _filtroFase);
 	 _query := REPLACE(_query, '[FILTRO_AJUIZADO]', _filtroAjuizado);
      _query := _query||_header||_campos;
