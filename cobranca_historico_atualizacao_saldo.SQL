@@ -1,3 +1,5 @@
+-- DROP FUNCTION public.cobranca_historico_atualizacao_saldo(int8);
+
 CREATE OR REPLACE FUNCTION public.cobranca_historico_atualizacao_saldo(_conparseq bigint)
  RETURNS void
  LANGUAGE sql
