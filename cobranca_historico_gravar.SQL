@@ -52,16 +52,19 @@ BEGIN
 	 -- Leitura de parcelas com registro de histórico existente;
 	 FOR _recordData IN (
 	     SELECT cp.conparseq,
-				ARRAY[cp.conpardatven, ch.conpardatven] conpardatven,
-				ARRAY[cp.conparvalsal, ch.conparvalsal] conparvalsal,
-				ARRAY[cp.conparvallan, ch.conparvallan] conparvallan,
-				ARRAY[con.carcod, ch.carcod] carcod,
-				ARRAY[con.procod, ch.procod] procod
+				cp.conpardatven,
+				ch.conpardatven conpardatvenhis,
+				cp.conparvalsal,
+				ch.conparvalsal conparvalsalhis,
+				cp.conparvallan,
+				ch.conparvallan conparvallanhis,
+				con.carcod, 
+				ch.carcod carcodhis,
+				con.procod, 
+				ch.procod procodhis
           FROM contrato con 
 			  JOIN contrato_parcela cp ON con.concod = cp.concod
-			  JOIN LATERAL (SELECT ch.conparseq, 
-		 						   ch.conparati, 
-		 						   ch.conpardatven, 
+			  JOIN LATERAL (SELECT ch.conpardatven, 
 		 						   ch.conparvallan, 
 		 						   ch.conparvalsal,
 		 						   ch.carcod,
@@ -71,25 +74,22 @@ BEGIN
 		 					 ORDER BY ch.cobhisseq DESC
 				 		     LIMIT 1) ch ON TRUE)                           
      LOOP
-	     
-	     IF _recordData.conparvallan[1] <> _recordData.conparvallan[2] THEN 
+	     IF _recordData.conparvallan <> _recordData.conparvallanhis THEN 
 	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 2);
 
-	     ELSEIF _recordData.conparvalsal[1] <> _recordData.conparvalsal[2] THEN 
+	     ELSEIF _recordData.conparvalsal <> _recordData.conparvalsalhis THEN 
 	       PERFORM cobranca_historico_atualizacao_saldo(_recordData.conparseq);	     
 	     
-	     ELSEIF _recordData.conpardatven[1] <> _recordData.conpardatven[2] THEN 
+	     ELSEIF _recordData.conpardatven <> _recordData.conpardatvenhis THEN 
 	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 4);
 	      
-	     ELSEIF _recordData.carcod[1] <> _recordData.carcod[2] THEN  
+	     ELSEIF _recordData.carcod <> _recordData.carcodhis THEN  
 	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 5);
 	     
-	     ELSEIF _recordData.procod[1] <> _recordData.procod[2] THEN 
+	     ELSEIF _recordData.procod <> _recordData.procodhis THEN 
 	       PERFORM cobranca_historico_atualizacao(_recordData.conparseq, 6);
-		 
 	     END IF;
 	 _message := 'Sucesso na execução.';
-	    
     END LOOP;
 	 
 	END IF;
